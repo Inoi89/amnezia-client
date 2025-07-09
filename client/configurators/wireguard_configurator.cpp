@@ -7,6 +7,9 @@
 #include <QString>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
+#include <QFile>
+#include <QUrl>
+#include <QMap>
 
 #include <openssl/pem.h>
 #include <openssl/rand.h>
@@ -231,4 +234,57 @@ QString WireguardConfigurator::processConfigWithExportSettings(const QPair<QStri
     processConfigWithDnsSettings(dns, protocolConfigString);
 
     return protocolConfigString;
+}
+
+QString WireguardConfigurator::createConfigFromFile(const QString &fileName, ErrorCode &errorCode)
+{
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        errorCode = ErrorCode::OpenError;
+        return QString();
+    }
+
+    QString data = QString::fromUtf8(file.readAll());
+    file.close();
+
+    QMap<QString, QString> configMap;
+    for (const QString &line : data.split("\n")) {
+        QString trimmed = line.trimmed();
+        if (trimmed.startsWith("[") && trimmed.endsWith("]"))
+            continue;
+        const QStringList parts = trimmed.split(" = ");
+        if (parts.size() == 2)
+            configMap[parts.at(0).trimmed()] = parts.at(1).trimmed();
+    }
+
+    auto url = QUrl::fromUserInput(configMap.value("Endpoint"));
+    if (!url.isValid() || url.host().isEmpty()) {
+        errorCode = ErrorCode::ImportInvalidConfigError;
+        return QString();
+    }
+
+    QJsonObject cfg;
+    cfg[config_key::hostName] = url.host();
+    cfg[config_key::port] = url.port() == -1 ? QString(protocols::wireguard::defaultPort).toInt()
+                                             : url.port();
+    cfg[config_key::client_priv_key] = configMap.value("PrivateKey");
+    cfg[config_key::client_ip] = configMap.value("Address");
+    cfg[config_key::server_pub_key] = configMap.value("PublicKey");
+    cfg[config_key::psk_key] = configMap.value("PresharedKey");
+    cfg[config_key::mtu] = configMap.value("MTU");
+    cfg[config_key::allowed_ips] = QJsonArray::fromStringList(configMap.value("AllowedIPs").split(", "));
+
+    QJsonObject jConfig;
+    jConfig[config_key::config] = data;
+    jConfig[config_key::hostName] = cfg[config_key::hostName];
+    jConfig[config_key::port] = cfg[config_key::port];
+    jConfig[config_key::client_priv_key] = cfg[config_key::client_priv_key];
+    jConfig[config_key::client_ip] = cfg[config_key::client_ip];
+    jConfig[config_key::server_pub_key] = cfg[config_key::server_pub_key];
+    jConfig[config_key::psk_key] = cfg[config_key::psk_key];
+    jConfig[config_key::mtu] = cfg[config_key::mtu];
+    jConfig[config_key::allowed_ips] = cfg[config_key::allowed_ips];
+
+    errorCode = ErrorCode::NoError;
+    return QJsonDocument(jConfig).toJson();
 }

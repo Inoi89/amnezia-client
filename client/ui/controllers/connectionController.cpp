@@ -7,6 +7,9 @@
 #endif
 
 #include "core/controllers/vpnConfigurationController.h"
+#include "configurators/wireguard_configurator.h"
+#include "core/controllers/serverController.h"
+#include "containers/containers_defs.h"
 #include "version.h"
 
 ConnectionController::ConnectionController(const QSharedPointer<ServersModel> &serversModel,
@@ -38,6 +41,12 @@ void ConnectionController::openConnection()
         return;
     }
 #endif
+
+    if (!m_configData.isEmpty()) {
+        QJsonObject cfg = QJsonDocument::fromJson(m_configData.toUtf8()).object();
+        emit connectToVpn(0, ServerCredentials(), DockerContainer::WireGuard, cfg);
+        return;
+    }
 
     int serverIndex = m_serversModel->getDefaultServerIndex();
     QJsonObject serverConfig = m_serversModel->getServerConfig(serverIndex);
@@ -163,6 +172,16 @@ void ConnectionController::toggleConnection()
         closeConnection();
     } else {
         emit prepareConfig();
+    }
+}
+
+void ConnectionController::importConfig(const QString &fileName)
+{
+    ErrorCode error = ErrorCode::NoError;
+    WireguardConfigurator cfg(m_settings, QSharedPointer<ServerController>(), false);
+    m_configData = cfg.createConfigFromFile(fileName, error);
+    if (error != ErrorCode::NoError) {
+        emit connectionErrorOccurred(error);
     }
 }
 
