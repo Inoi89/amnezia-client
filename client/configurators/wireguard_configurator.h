@@ -30,6 +30,9 @@ public:
     QString createConfig(const ServerCredentials &credentials, DockerContainer container,
                          const QJsonObject &containerConfig, ErrorCode &errorCode);
 
+    //! Create WireGuard configuration from local .conf file
+    QString createConfigFromFile(const QString &fileName, ErrorCode &errorCode);
+
     QString processConfigWithLocalSettings(const QPair<QString, QString> &dns, const bool isApiConfig,
                                            QString &protocolConfigString);
     QString processConfigWithExportSettings(const QPair<QString, QString> &dns, const bool isApiConfig,

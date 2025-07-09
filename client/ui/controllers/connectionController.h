@@ -30,6 +30,8 @@ public:
 public slots:
     void toggleConnection();
 
+    void importConfig(const QString &fileName);
+
     void openConnection();
     void closeConnection();
 
@@ -64,6 +66,8 @@ private:
     QSharedPointer<VpnConnection> m_vpnConnection;
 
     std::shared_ptr<Settings> m_settings;
+
+    QString m_configData;
 
     bool m_isConnected = false;
     bool m_isConnectionInProgress = false;
